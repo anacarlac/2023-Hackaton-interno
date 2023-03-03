@@ -10,5 +10,8 @@ usethis::create_github_token()
 # Adicionar o token gerado no .Renviron: GITHUB_PAT= = COPIAR+COLAR_TOKEN
 usethis::edit_r_environ()
 
-# Teste com hackaton
+# Teste com Hackaton 2023 (Answers: Yes; Yes)
 usethis::use_git()
+
+# Conectando o projeto com gi
+usethis::use_github()

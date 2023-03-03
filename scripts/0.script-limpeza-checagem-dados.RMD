@@ -1,6 +1,6 @@
 ---
 title: "Script de limpeza e checagem da integridade dos dados"
-author: "eduLab21®"
+author: "eduLab21® (Ana C e Gustavo)"
 date: "Relatório produzido em: `r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
