@@ -168,3 +168,9 @@ frq(dt_nome_clean$idade)
 frq(dt_nome_clean$anoescolar)
 ```
 
+
+
+Falta gustavo incluir:
+- Falar sobre transformação de long pra wide (pivot_wide)
+- Recode (sim e não; F e M; 5º ano....)
+- fazer escore de attention check # Retirar casos a partir de >20% de erros com 5 ou mais attention checks OU 2 erros em attention check no caso de ter 2 ~ 4 attention checks no questionário todo (ver como calcular chk_scr no sp 2019)

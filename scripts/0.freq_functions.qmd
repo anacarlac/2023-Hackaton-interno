@@ -1,0 +1,249 @@
+---
+title: "Frequency Functions"
+author: "Alexandre Peres"
+format: html
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+editor: visual
+---
+
+## wider_freq_by
+
+**R**etorna um data frame e um xlsx com uma tabela larga com n e percentuais por categoria de resposta das variáveis desejadas agrupadas conforme interesse..
+
+**Argumentos da função:**
+
+-   df = dataframe.
+
+-   group = vetor com os nomes das variáveis que agruparão os resultados.
+
+-   vars = vetor com os nomes das variáveis a serem analisadas.
+
+-   dic = dataframe/dicionario com as colunas código do item, texto do item e categorias de resposta.
+
+-   items_cod = nome da coluna do input que contenha os códigos dos itens.
+
+-   items_text = nome da coluna do input que contenha o texto dos itens.
+
+-   items_cat = vetor com os nomes das colunas do input que contenham as categorias de resposta dos itens.
+
+-   round_to = quantidade de casas decimais para os percentuais que serão obtidos.
+
+-   excel_to = endereço do diretório onde salvar um xlsx com os resultados.
+
+-   excel_name = nome do arquivo excel a ser salvo (não é necessário colocar a extensão do arquivo).
+
+**Valores:**
+
+A função retorna um objeto chamado "freq" com quantidades e percentuais de respostas nas categorias de resposta das variáveis, por grupo e geral, e salva o objeto como um arquivo xlsx. Além disso, a função retorna o texto e as categorias de resposta referentes aos itens, conforme dicionário.
+
+-   ***n_abs_i*****:** quantidade de respostas referentes a categoria de resposta *i*. Por exemplo, ***n_abs_1*** é a quantidade de ***n*** respostas na categoria ***1*** dentro do grupo especificado.
+
+-   ***perc_abs_i:*** percentual de respostas referentes a categoria de resposta *i*. Por exemplo, ***perc_abs_1*** é o percentual de respostas na categoria ***1*** dentro do grupo especificado.
+
+**Poréns**
+
+É necessário informar os grupos a serem desagregados, pois a função não possui default para realizar as análises sem agrupamentos. Para tanto, use a função `wider_freq`.
+
+**Função:**
+
+```{r}
+
+# Função
+#df, vars, dic, items_cod, items_text, items_cat, round_to, excel_to, excel_name
+
+wider_freq_by <-
+  function(df, vars, group,
+           dic, items_cod, items_text, items_cat,
+           round_to, excel_to, excel_name){
+    library(dplyr)
+    options(dplyr.summarise.inform = FALSE)
+    items <- distinct(dic, .keep_all = TRUE) %>% 
+             select(items_cod, items_text, items_cat)
+    coditem <- names(items[,1])
+    freq <- data.frame()
+    for (i in vars) {
+      freq <- df %>%
+        group_by_at(c(group, i)) %>%
+        summarize(n_abs=n()) %>%
+        na.omit() %>%
+        mutate(perc_abs = round((n_abs/sum(n_abs)*100), round_to)) %>% 
+        pivot_wider(id_cols = group,
+                    names_from = i,
+                    values_from = c(n_abs, perc_abs)) %>% 
+        mutate(coditem = i, .after=last(group)) %>%  
+        rbind(freq) %>%
+        arrange(coditem)
+    } 
+
+    
+    freq <- freq %>%
+        left_join(items, by="coditem") %>%
+        relocate(textitem, .after = coditem) %>%   
+        unique()
+    {
+
+      freq <<- freq
+      freq %>% writexl::write_xlsx(path = paste0(excel_to, excel_name, ".xlsx"),
+                                   col_names = TRUE)
+      freq
+    } 
+      
+  }
+
+
+# Exemplo de uso
+
+#df <- readRDS("E:/IAS/Avaliação do Futuro/2021/Análises/violence.rds")
+#dicionario <- readxl::read_excel("E:/IAS/Avaliação do Futuro/2021/Análises/dic_geral.xlsx")
+library(tidyverse)
+group <- c("NomeDepBol.x", "nivel_profic_lp")
+vars <- c("Vlncx_01","Vlncx_02",
+          "Vlncx_03","Vlncx_04",
+          "Vlncx_05","Vlncx_06",
+          "Vlncx_07","Vlncx_08",
+          "Vlnc6_01","Vlnc5_01",
+          "Vlnc5_02","Vlnc5_03",
+          "Vlnc5_04","Vlnc5_05",
+          "Vlnc5_06","Vlnc6_02",
+          "Vlnc6_03","Vlnc6_04",
+          "Vlnc6_05","Vlnc6_06",
+          "Vlnc6_07")
+dic <- readxl::read_excel("E:/IAS/Avaliação do Futuro/2021/Análises/dic_geral.xlsx")
+items_cod <- "coditem"
+items_text <- "item_text_pt"
+items_cat <- c("opt1", "opt2", "opt3",
+               "opt4", "opt5", "opt6")
+round_to <- 2
+excel_to <- "E:/IAS/Avaliação do Futuro/2021/Análises/"
+excel_name <- "test_wider_freq_by"
+
+
+wider_freq_by(df = df,
+              vars = vars,
+              group = group,
+              dic = dic,
+              items_cod = items_cod,
+              items_text = items_text,
+              items_cat = items_cat,
+              round_to = round_to,
+              excel_to = excel_to,
+              excel_name = excel_name)
+
+```
+
+## 
+
+## wider_freq
+
+**R**etorna um data frame e um xlsx com uma tabela larga com n e percentuais por categoria de resposta das variáveis desejadas. Para fazer a mesma análise por grupo, use a função `wider_freq_by`.
+
+**Argumentos da função:**
+
+-   df = dataframe.
+
+-   vars = vetor com os nomes das variáveis a serem analisadas.
+
+-   dic = dataframe/dicionario com as colunas código do item, texto do item e categorias de resposta.
+
+-   items_cod = nome da coluna do input que contenha os códigos dos itens.
+
+-   items_text = nome da coluna do input que contenha o texto dos itens.
+
+-   items_cat = vetor com os nomes das colunas do input que contenham as categorias de resposta dos itens.
+
+-   round_to = quantidade de casas decimais para os percentuais que serão obtidos.
+
+-   excel_to = endereço do diretório onde salvar um xlsx com os resultados.
+
+-   excel_name = nome do arquivo excel a ser salvo (não é necessário colocar a extensão do arquivo).
+
+**Valores:**
+
+A função retorna um objeto chamado "freq" com quantidades e percentuais de respostas nas categorias de resposta das variáveis e salva o objeto como um arquivo xlsx. Além disso, a função retorna o texto e as categorias de resposta referentes aos itens, conforme dicionário.
+
+-   ***n_abs_i*****:** quantidade de respostas referentes a categoria de resposta *i*. Por exemplo, ***n_abs_1*** é a quantidade de ***n*** respostas na categoria ***1*** dentro do grupo especificado.
+
+-   ***perc_abs_i:*** percentual de respostas referentes a categoria de resposta *i*. Por exemplo, ***perc_abs_1*** é o percentual de respostas na categoria ***1*** dentro do grupo especificado.
+
+**Função:**
+
+```{r}
+wider_freq <-
+  function(df, vars, dic, items_cod, items_text, items_cat, round_to, excel_to, excel_name){
+    library(dplyr)
+    options(dplyr.summarise.inform = FALSE)
+    items <- distinct(dic, .keep_all = TRUE) %>% 
+             select(items_cod, items_text, items_cat)
+    coditem <- names(items[,1])
+    freq <- data.frame()
+    {
+      freq <- df %>%
+        select(vars) %>%
+        gather(key, value) %>%
+        na.omit() %>%
+        count(key, value) %>% 
+        group_by(key) %>% 
+        mutate(perc = round((n/sum(n)*100), round_to)) %>% 
+        rename(coditem=key, n_abs=n, perc_abs=perc) %>% 
+        pivot_wider(id_cols = coditem,
+                    names_from = value,
+                    values_from = c(n_abs, perc_abs)) 
+        
+      
+      freq <- freq %>%
+        left_join(items, by="coditem") %>%
+        relocate(textitem, .after = coditem) %>% 
+        distinct(coditem, .keep_all = TRUE)
+
+      
+      }
+    {
+
+      freq <<- freq
+      freq %>% writexl::write_xlsx(path = paste0(excel_to, excel_name, ".xlsx"),
+                                   col_names = TRUE)
+      freq
+    } 
+      
+  }
+
+
+# Exemplo de uso
+
+#df <- readRDS("E:/IAS/Avaliação do Futuro/2021/Análises/violence.rds")
+#dicionario <- readxl::read_excel("E:/IAS/Avaliação do Futuro/2021/Análises/dic_geral.xlsx")
+library(tidyverse)
+vars <- c("Vlncx_01","Vlncx_02",
+          "Vlncx_03","Vlncx_04",
+          "Vlncx_05","Vlncx_06",
+          "Vlncx_07","Vlncx_08",
+          "Vlnc6_01","Vlnc5_01",
+          "Vlnc5_02","Vlnc5_03",
+          "Vlnc5_04","Vlnc5_05",
+          "Vlnc5_06","Vlnc6_02",
+          "Vlnc6_03","Vlnc6_04",
+          "Vlnc6_05","Vlnc6_06",
+          "Vlnc6_07")
+dic <- readxl::read_excel("E:/IAS/Avaliação do Futuro/2021/Análises/dic_geral.xlsx")
+items_cod <- "coditem"
+items_text <- "item_text_pt"
+items_cat <- c("opt1", "opt2", "opt3",
+               "opt4", "opt5", "opt6")
+round_to <- 2
+excel_to <- "E:/IAS/Avaliação do Futuro/2021/Análises/"
+excel_name <- "test_wider_freq"
+
+
+wider_freq(df = df,
+           vars = vars,
+           dic = dic,
+           items_cod = items_cod,
+           items_text = items_text,
+           items_cat = items_cat,
+           round_to = 2,
+           excel_to = excel_to,
+           excel_name = excel_name)
+
+
+
+```
