@@ -1,0 +1,170 @@
+---
+title: "Script de limpeza e checagem da integridade dos dados"
+author: "eduLab21®"
+date: "Relatório produzido em: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    css: style.css
+    theme: united
+    includes:
+      in_header: logo.html
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: false
+    code_folding: hide
+    code_download: true
+link-citations: true
+---
+
+```{r setup, warning=FALSE, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+```{r pacotes_db}
+# Pacotes -----------------------------------------------------------------
+library(readxl) # Pacote para abrir dados em Excel .xlsx
+library(tidyverse) # Pacote para manipulação de dados
+library(janitor) # Pacote para ajuste dos nomes das variáveis
+library(careless) # Pacote para checagem de respostas repetidas
+library(stringr) # Pacote para substituir nomes de variáveis
+library(summarytools) # Pacote para checagem de estatísticas descritivas
+library(htmltools) # Pacote para gerar markdown com layout com template IAS
+
+# Extras
+library(haven) # Pacote para abrir dados de Stata ou SPSS
+library(lubridate) # Pacote para trabalhar com dados em formato de data
+
+```
+
+```{r load-dt}
+# Importar banco (Alterar para Knit > Knit directory > Project directory)
+# Carregar o banco + dicionário e usar funções de acordo com formato do banco
+# Bancos de dados que não foram limpos devem ser mantidos na pasta data-raw
+# ATENÇÃO: substituir 'nome' de 'dt_nome' por nome do estudo ou construto
+dt_nome <- read_excel("data-raw/XXX.xlsx")
+
+dic <- read_excel("dic/XXX.xlsx")
+```
+
+```{r}
+# Identificar nome das variáveis no banco de dados
+dt_nome %>%
+  dplyr::select() %>% 
+  names()
+```
+
+```{r}
+# Limpeza dos nomes
+# Caso os nomes das variáveis estejam com letra maiúscula OU com espaço entre nomes (e.g. 'Nome Aluno'), OU acentos, usar a linha de código abaixo para padronização dos nomes em letras minúsculas com espaços substituídos por _
+
+# Limpeza de nomes
+dt_nome_clean <- dt_nome %>% 
+  clean_names()
+
+# Após a limpeza, caso as variáveis venham com caracteres iguais antes do nome esperado da variável, usar o código abaixo
+
+dt_nome_clean <- dt_nome_clean %>% 
+  rename_all(~stringr::str_replace(.,
+                                   "^nome a ser substituído nas variáveis (e.g. substituir as palavras 'seleciona_1_a_5' nos nomes das variáveis",
+                                   "nome a ser colocado onde haverá substituições "))
+
+names(dt_nome_clean)
+```
+
+### ATENÇÃO
+Se o método de coleta de dados for BIB, é necessário checar se todos os cadernos estão agregados em um único arquivo/objeto/banco de dados OU se eles estão em arquivos separados (por exemplo, um banco de dados para cada booklet). Neste segundo caso, é necessário montar o banco de dados antes de prosseguir. Nessa caso, checar o script de limpeza de dados de SP 2021 para buscar o método de junção de bancos de dados divididos por cadernos (linhas de código 300 a 400 no script 0. data_preparation.RMD)
+```{r}
+# juntar com bind_rows ou merge quando os nomes estiverem corretos
+```
+
+
+# Checagem de quantas respostas foram indicadas por cada estudante (vetor do total de respostas)
+
++ Essa checagem auxilia para saber quantos estudantes não responderam nenhuma pergunta assim como auxilia na checagem de total de respostas para estudos com BIB. Caso um estudo com BIB seja usado, é recomendado que se faça um group_by(booklet) + frq(tot_non_missing_r) para checar se a aplicação dos cadernos está correta e contém o número de itens propostos em cada caderno.
+
++ Para saber quais estudantes não responderam nenhum item, indicar total non-missing responses == 0.
+
+Resultado:
+
+```{r}
+# No select, indicar quais colunas devem ser usadas para calcular a pontuação de missing. Por exemplo, caso as dez colunas inicias se refiram a dados cadastrais que são enviados pela rede e o objetivo é saber quais alunos não responderam o questionário, indicar 11:300, caso o banco contenha trezentas variáveis.  
+
+# No select, os números são fictícios e representam a seleção da quarta coluna até a coluna 300.  
+
+dt_nome_clean$tot_non_missing_r <-  dt_nome_clean %>% 
+ select(4:300)
+ apply(MARGIN = 1, 
+       function(x){sum(!is.na(x), na.rm =T)})
+
+dt_nome_clean$tot_non_missing_r %>% 
+  frq
+```
+
+# Checagem de dados duplicados em todas as linhas
+
+-   Resultado: 
+
+```{r}
+# Checagem de dados duplicados
+# Na linha de código abaixo é verificado se existem dados com as mesmas respostas em todas as variáveis do banco de dados, retirando a variável id. 
+# A verificação de dados duplicados deve ser feita usando variáveis úteis para cada banco
+
+# Código padrão
+get_dupes(dt_nome_clean, -id)
+
+# Exemplo 1: Checagem de linhas duplicadas por erro no sistema, incluindo código ID
+get_dupes(dt_nome_clean)
+
+# Exemplo 2: Checagem de linhas duplicadas caso estudantes tenham respondido mais de uma vez
+get_dupes(dt_nome_clean,  id)
+
+```
+
+# Checagem de respostas descuidadas
+
+-   Resultado: 
+
+```{r}
+# Remoção de respostas descuidadas
+# A função longstring irá criar um escore que identifica quantas respostas iguais foram identificadas sequencialmente para cada estudante. Quanto maior o número, mais respostas iguais foram realizadas pelo estudante.
+# Filtrar variáveis que permitem a mesma resposta sequencialmente apenas
+# Por exemplo, checar respostas descuidadas para todos os questionários de autorrelato
+dt_nome_clean_careless <- dt_nome_clean %>% 
+  select("nomes das variáveis OU vetor OU seleção via starts/ends with")
+
+dt_nome_clean_careless$careless <- longstring(dt_nome_clean_careless, avg = FALSE)
+
+# Frequência de estudantes por número de respostas descuidadas
+freq(dt_nome_clean_careless$careless)
+```
+
+# Checagem de attention check
+
+- Resultado: 
+```{r}
+# Para attention checks, as perguntas devem conter a resposta correta no nome. Por exemplo, se a resposta correta do att_chk1 é 2, então, o nome da variável deve ser att_chk1_2
+
+frq(dt_nome_clean$att_chk1_X) # 
+frq(dt_nome_clean$att_chk1_X) # 
+frq(dt_nome_clean$att_chk1_X) # 
+frq(dt_nome_clean$att_chk1_X) # 
+frq(dt_nome_clean$att_chk1_X) # 
+
+# fazer escore de attention check # Retirar casos a partir de >20% de erros com 5 ou mais attention checks OU 2 erros em attention check no caso de ter 2 ~ 4 attention checks no questionário todo (ver como calcular chk_scr no sp 2019)
+
+```
+
+# Checagem de características esperadas dos dados
+
+Essa etapa visa identificar se o banco de dados contém informações de características sociodemográficas ou escolares que são esperadas para o banco. Por exemplo, o banco de dados tem outros anos escolares além dos anos escolares previstos para a coleta? Como a variável de gênero está caegorizado?
+
+- Resultado:
+```{r}
+frq(dt_nome_clean$sexo)
+frq(dt_nome_clean$idade)
+frq(dt_nome_clean$anoescolar)
+```
+
