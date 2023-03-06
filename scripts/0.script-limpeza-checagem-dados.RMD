@@ -77,7 +77,15 @@ names(dt_nome_clean)
 ### ATENÇÃO
 Se o método de coleta de dados for BIB, é necessário checar se todos os cadernos estão agregados em um único arquivo/objeto/banco de dados OU se eles estão em arquivos separados (por exemplo, um banco de dados para cada booklet). Neste segundo caso, é necessário montar o banco de dados antes de prosseguir. Nessa caso, checar o script de limpeza de dados de SP 2021 para buscar o método de junção de bancos de dados divididos por cadernos (linhas de código 300 a 400 no script 0. data_preparation.RMD)
 ```{r}
-# juntar com bind_rows ou merge quando os nomes estiverem corretos
+# Usar uma das seguinte funções para juntar o bancos quando os col_names estiverem corretos
+dplyr::bind_rows()
+merge()
+```
+
+Também é importante checar se o banco está em formato wide (i.e., sujeito nas linhas e variáveis nas colunas). Caso esteja em formato long, transformar para formato wide antes de fazer os próximos passos de limpeza.
+```{r}
+# Usar a seguinte função para transformar de long para wide
+tidyr::pivot_wider()
 ```
 
 
@@ -95,9 +103,13 @@ Resultado:
 # No select, os números são fictícios e representam a seleção da quarta coluna até a coluna 300.  
 
 dt_nome_clean$tot_non_missing_r <-  dt_nome_clean %>% 
- select(4:300)
- apply(MARGIN = 1, 
-       function(x){sum(!is.na(x), na.rm =T)})
+  select(4:300) %>% 
+  apply(
+    MARGIN = 1, 
+    function(x){
+      sum(!is.na(x), na.rm =T)
+    }
+  )
 
 dt_nome_clean$tot_non_missing_r %>% 
   frq
@@ -153,13 +165,93 @@ frq(dt_nome_clean$att_chk1_X) #
 frq(dt_nome_clean$att_chk1_X) # 
 frq(dt_nome_clean$att_chk1_X) # 
 
-# fazer escore de attention check # Retirar casos a partir de >20% de erros com 5 ou mais attention checks OU 2 erros em attention check no caso de ter 2 ~ 4 attention checks no questionário todo (ver como calcular chk_scr no sp 2019)
+# fazer escore de attention check 
+# definir as respostas corretas de cada item (talvez essa informação já tenha no dic itens)
+resp_corretas_att_chk <- c(2, 4, 1, 5, 3)
 
+# criar uma nova coluna com valor 1 se a resposta for correta e 0 se não for
+dt_nome_clean <- mutate(
+  dt_nome_clean, 
+  att_chk1_2_errada = ifelse(att_chk1_2 != resp_corretas_att_chk[1], 1, 0),
+  att_chk1_4_errada = ifelse(att_chk1_4 != resp_corretas_att_chk[2], 1, 0),
+  att_chk1_1_errada = ifelse(att_chk1_1 != resp_corretas_att_chk[3], 1, 0),
+  att_chk1_5_errada = ifelse(att_chk1_5 != resp_corretas_att_chk[4], 1, 0),
+  att_chk1_3_errada = ifelse(att_chk1_3 != resp_corretas_att_chk[5], 1, 0)
+)
+
+# somar o número de respostas corretas de cada sujeito
+dt_nome_clean <- mutate(dt, erros_att_chk = rowSums(select(dt_nome_clean, ends_with("_errada"))))
+
+# Retirar casos a partir de > 20% de erros com 5 ou mais attention checks OU 2 erros em attention check no caso de ter 2 ~ 4 attention checks no questionário todo
+dt_nome_clean <- dt_nome_clean %>% 
+  filter(!erros_att_chk >= 2)
+
+
+#### Exemplo
+# criar um data frame com 500 respostas em 5 itens
+dt <- data.frame(
+  it_1 = sample(1:5, 500, replace = TRUE),
+  it_2 = sample(1:5, 500, replace = TRUE),
+  it_3 = sample(1:5, 500, replace = TRUE),
+  it_4 = sample(1:5, 500, replace = TRUE),
+  it_5 = sample(1:5, 500, replace = TRUE)
+)
+
+# definir as respostas corretas de cada item
+respostas_corretas <- c(2, 4, 1, 5, 3)
+
+# criar uma nova coluna com valor 1 se a resposta for correta e 0 se não for
+dt <- mutate(dt, it_1_errada = ifelse(it_1 != respostas_corretas[1], 1, 0),
+                  it_2_errada = ifelse(it_2 != respostas_corretas[2], 1, 0),
+                  it_3_errada = ifelse(it_3 != respostas_corretas[3], 1, 0),
+                  it_4_errada = ifelse(it_4 != respostas_corretas[4], 1, 0),
+                  it_5_errada = ifelse(it_5 != respostas_corretas[5], 1, 0))
+
+# somar o número de respostas corretas de cada sujeito
+dt <- mutate(dt, erros = rowSums(select(dt, ends_with("_errada"))))
+
+# remover sujeitos que tiveram > 20% de erro
+dt <- dt %>% 
+  filter(!erros >= 2)
+```
+
+# Recodificar variáveis
+
+Essa etapa visa padronizar as principais variáveis do banco de forma que outras pessoas consigam saber do que se trata. Para isso sugerímos a padronização das seguintes variáveis desta forma:
+- sexo:
+  F = feminino
+  M = masculino
+- ano_escolar:
+  1º ano
+  2º ano
+  3º ano
+  ...
+  9º ano
+  1ª série
+  2ª série
+  3ª série
+- estado
+  SP
+  MG
+  MS
+  ...
+- variáveis dicotômicas
+  sim
+  não
+
+```{r}
+# Usar a função recode para recodificar as variáveis
+dt_nome_clean <- dt_nome_clean %>% 
+  recode(
+    sexo,
+    "masculino" = M,
+    "feminino" = F
+  )
 ```
 
 # Checagem de características esperadas dos dados
 
-Essa etapa visa identificar se o banco de dados contém informações de características sociodemográficas ou escolares que são esperadas para o banco. Por exemplo, o banco de dados tem outros anos escolares além dos anos escolares previstos para a coleta? Como a variável de gênero está caegorizado?
+Essa etapa visa identificar se o banco de dados contém informações de características sociodemográficas ou escolares que são esperadas para o banco. Por exemplo, o banco de dados tem outros anos escolares além dos anos escolares previstos para a coleta?
 
 - Resultado:
 ```{r}
@@ -168,9 +260,3 @@ frq(dt_nome_clean$idade)
 frq(dt_nome_clean$anoescolar)
 ```
 
-
-
-Falta gustavo incluir:
-- Falar sobre transformação de long pra wide (pivot_wide)
-- Recode (sim e não; F e M; 5º ano....)
-- fazer escore de attention check # Retirar casos a partir de >20% de erros com 5 ou mais attention checks OU 2 erros em attention check no caso de ter 2 ~ 4 attention checks no questionário todo (ver como calcular chk_scr no sp 2019)
